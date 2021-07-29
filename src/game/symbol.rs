@@ -9,14 +9,14 @@ use std::fmt::{Display, Formatter};
 pub enum Symbol {
     X = b'X',
     O = b'O',
-    EMPTY = b' ',
+    EMPTY = b' '
 }
 
 impl Symbol {
     /// Convert the symbol to an ASCII character
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The symbol represented as a byte, then
     /// converted to an ASCII character
     pub fn as_char(&self) -> char {
@@ -28,5 +28,16 @@ impl Display for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let sym = self.as_char();
         write!(f, "{}", sym)
+    }
+}
+
+impl From<char> for Symbol {
+    fn from(c: char) -> Self {
+        match c {
+            'X' | 'x' => Symbol::X,
+            'O' | 'o' => Symbol::O,
+            ' ' => Symbol::EMPTY,
+            _ => panic!("")
+        }
     }
 }

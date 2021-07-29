@@ -1,147 +1,137 @@
 use super::symbol::Symbol;
-
-use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::{fmt, usize};
 
-/// TicTacToe game logic
 #[derive(Debug)]
 pub struct TicTacToe {
-    /// The current boards state, 
-    /// represented as a 2D array
-    board: [[Symbol; 3]; 3],
+    board: [Symbol; 9]
 }
 
 impl TicTacToe {
-    /// Create a new TicTacToe game with an empty board
-    /// 
-    /// # Returns
-    /// 
-    /// New TicTacToe game instance
     pub fn new() -> Self {
         Self {
-            board: [
-                [Symbol::EMPTY, Symbol::EMPTY, Symbol::EMPTY],
-                [Symbol::EMPTY, Symbol::EMPTY, Symbol::EMPTY],
-                [Symbol::EMPTY, Symbol::EMPTY, Symbol::EMPTY],
-            ],
+            board: [Symbol::EMPTY; 9]
         }
     }
 
-    /// Sets a given cell to a given symbol
-    /// 
-    /// # Arguments
-    /// 
-    /// * `cell` - The cell to set in the form (row, col)
-    /// * `sym` - The symbol to set at the given cell
-    pub fn set(&mut self, cell: (usize, usize), sym: Symbol) {
-        self.board[cell.0][cell.1] = sym;
+    /// Resets the game to it's initial state
+    pub fn reset(&mut self) {
+        self.board = [Symbol::EMPTY; 9];
     }
 
-    /// Decide if a move can be made on the given space
-    /// 
-    /// # Arguments
-    /// 
-    /// * `cell` - The cell to check in the form (row, col)
-    pub fn legal_move(&self, cell: (usize, usize)) -> bool {
-        self.board[cell.0][cell.1] == Symbol::EMPTY
+    /// Forces the game to a state based on the given 'flat_state'
+    pub fn from_state(&mut self, flat_state: &String) {
+        for (i, c) in flat_state.chars().enumerate() {
+            self.board[i] = Symbol::from(c);
+        }
     }
 
-    /// Check if the board has no EMPTY spaces left
-    /// 
+    /// Places the specified piece at index `action` on the board
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if `action` is a legal move, `Err(msg)` otherwise
+    pub fn place_piece(&mut self, piece: Symbol, action: u8) -> Result<(), String> {
+        if self.board[action as usize] != Symbol::EMPTY {
+            return Err(format!("'{}' is not an empty space!", action));
+        }
+        self.board[action as usize] = piece;
+
+        Ok(())
+    }
+
     /// # Returns
     /// 
-    /// True if the board is full (all cells occupied by
-    /// either X or O), false otherwise
-    pub fn board_full(&self) -> bool {
-        for row in &self.board {
-            for sym in row {
-                if *sym == Symbol::EMPTY {
-                    return false;
-                }
+    /// A list of the next possible flattened states the game could have
+    pub fn next_states(&self, piece: Symbol) -> Vec<String> {
+        self.legal_moves().iter().map(|action| {
+            let mut board = self.board.clone();
+
+            board[*action as usize] = piece;
+            board.iter().map(
+                |cell| cell.as_char()
+            ).collect()
+        }).collect()
+    }
+
+    /// Determines if the specified piece has won the game
+    ///
+    /// # Returns
+    ///
+    /// `true` if the piece meets winning criteria, `false` otherwise
+    pub fn is_winner(&self, piece: Symbol) -> bool {
+        let win_conds: [[u8; 3]; 8] = [
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            [0, 4, 8],
+            [2, 4, 6]
+        ];
+
+        for win_cond in win_conds.iter() {
+            if win_cond.iter().all(|&c| self.board[c as usize] == piece) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// # Returns
+    /// 
+    /// 'true' if the game has ended in a draw, 'false' otherwise
+    pub fn is_draw(&self) -> bool {
+        for cell in self.board.iter() {
+            if *cell == Symbol::EMPTY {
+                return false
             }
         }
         true
     }
 
-    /// Check if either X's or O's has won. First,
-    /// each row is checked. Then each column, then both diagonals
-    /// 
     /// # Returns
-    /// 
-    /// True if a winner was found, false otherwise
-    pub fn check_win(&self) -> bool {
-        for row in &self.board {
-            if row[0] == row[1] && row[1] == row[2] && row[0] != Symbol::EMPTY {
-                return true;
-            }
-        }
-
-        for col in 0..=2 {
-            if self.board[0][col] == self.board[1][col]
-                && self.board[1][col] == self.board[2][col]
-                && self.board[0][col] != Symbol::EMPTY
-            {
-                return true;
-            }
-        }
-
-        if self.board[1][1] != Symbol::EMPTY {
-            return (self.board[0][0] == self.board[1][1] && self.board[1][1] == self.board[2][2])
-                || (self.board[0][2] == self.board[1][1] && self.board[1][1] == self.board[2][0]);
-        }
-        false
-    }
-
-    /// Transforms the 2D board state into a flattened string
-    /// 
-    /// # Returns
-    /// 
-    /// String with each row serialized after the other,
-    /// Creating a 1D string from a 2D array
-    pub fn flatten(&self) -> String {
+    ///
+    /// A flattened string representation of `board`
+    pub fn flat(&self) -> String {
         let mut flattened = String::new();
 
-        for row in &self.board {
-            for col in row {
-                flattened.push(col.as_char());
-            }
+        for piece in self.board.iter() {
+            flattened.push(piece.as_char());
         }
         flattened
     }
 
-    /// Generates a list of possible moves that either player
-    /// could make, given the current board state
-    /// 
     /// # Returns
-    /// 
-    /// List of tuples representing each cell that's 
-    /// occupied by the EMPTY symbol
-    pub fn possible_moves(&self) -> Vec<(usize, usize)> {
-        let mut moves: Vec<(usize, usize)> = Vec::new();
+    ///
+    /// A list of all legal moves that can be made
+    fn legal_moves(&self) -> Vec<u8> {
+        let mut allowed_actions: Vec<u8> = Vec::with_capacity(9);
 
-        for row in 0..=2 {
-            for col in 0..=2 {
-                if self.board[row][col] == Symbol::EMPTY {
-                    moves.push((row as usize, col as usize));
-                }
+        for (i, piece) in self.board.iter().enumerate() {
+            if piece == &Symbol::EMPTY {
+                allowed_actions.push(i as u8);
             }
         }
-        moves
+        allowed_actions
     }
 }
 
 impl Display for TicTacToe {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut row_count = 0;
+        let mut str_board = String::new();
 
-        for row in &self.board {
-            writeln!(f, " {} | {} | {}", row[0], row[1], row[2])?;
+        for (i, cell) in self.board.iter().enumerate() {
+            if (i != 0) && (i % 3 == 0) {
+                str_board.push_str("\n-----------\n");
+            }
+            str_board.push_str(format!(" {} ", cell).as_str());
 
-            row_count += 1;
-            if row_count < 3 {
-                writeln!(f, "-----------")?;
+            if (i + 1) % 3 != 0 {
+                str_board.push('|');
             }
         }
-        Ok(())
+        write!(f, "{}", str_board)
     }
 }
